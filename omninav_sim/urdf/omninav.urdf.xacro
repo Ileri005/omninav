@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot name="omninav" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<xacro:property name="chassis_length" value="0.33"/>
+<xacro:property name="chassis_width" value="0.268"/>
+<xacro:property name="chassis_height" value="0.004"/>
+<xacro:property name="chassis_mass" value="2.135"/>
+<xacro:property name="wheel_radius" value="0.05005"/>
+<xacro:property name="wheel_width" value="0.094"/>
+<xacro:property name="wheel_mass" value="0.141"/>
+<xacro:property name="wheel_x_offset" value="0.167"/>
+<xacro:property name="wheel_y_offset" value="0.115"/>
+<xacro:property name="lidar_mass" value="0.05" />
+<xacro:property name="lidar_radius" value="0.02" />
+<xacro:property name="lidar_length" value="0.03" />
+
+<material name="grey">
+    <color rgba="0.663 0.663 0.663 1" />
+</material>
+
+<link name="base_footprint"/>
+
+<joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0.0 0.0 ${wheel_radius}" rpy="0.0 0.0 0.0"/>
+</joint>
+
+<link name="base_link">
+    <visual>
+        <geometry>
+            <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+        <material name="grey"/>
+    </visual>
+
+    <collision>
+        <geometry>
+            <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+    </collision>
+
+    <inertial>
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        <mass value="${chassis_mass}"/>
+        <inertia ixx="${(chassis_mass/12) * ((chassis_width*chassis_width) + (chassis_height*chassis_height))}" ixy="0.0" ixz="0.0"
+        iyy="${(chassis_mass/12) * ((chassis_length*chassis_length) + (chassis_height*chassis_height))}" iyz="0.0"
+        izz="${(chassis_mass/12) * ((chassis_width*chassis_width) + (chassis_length*chassis_length))}"/>
+    </inertial>
+</link>
+
+<xacro:macro name="wheel" params="prefix x_reflect y_reflect">
+    <link name="${prefix}_wheel_link">
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="1.5708 0.0 0.0"/>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+            <material name="grey"/>
+        </visual>
+
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="1.5708 0.0 0.0"/>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+            </geometry>
+        </collision>
+
+        <!-- Inertial frame is rotated like the cylinder, so the cylinder axis is this frame's z,
+             izz = m r^2 / 2 (spin axis), ixx = iyy = m (3r^2 + h^2) / 12 -->
+        <inertial>
+            <origin xyz="0.0 0.0 0.0" rpy="1.5708 0.0 0.0"/>
+            <mass value="${wheel_mass}"/>
+            <inertia ixx="${(wheel_mass/12) * (3*wheel_radius*wheel_radius + wheel_width*wheel_width)}" ixy="0.0" ixz="0.0"
+            iyy="${(wheel_mass/12) * (3*wheel_radius*wheel_radius + wheel_width*wheel_width)}" iyz="0.0"
+            izz="${(wheel_mass/2) * (wheel_radius*wheel_radius)}"/>
+        </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="${prefix}_wheel_link"/>
+        <axis xyz="0 1 0"/>
+        <origin xyz="${x_reflect*wheel_x_offset} ${y_reflect*wheel_y_offset} 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Frictionless wheels - they only hold the body up; VelocityControl moves the body -->
+    <gazebo reference="${prefix}_wheel_link">
+        <mu1>0.0</mu1>
+        <mu2>0.0</mu2>
+    </gazebo>
+</xacro:macro>
+
+<xacro:wheel prefix="front_left" x_reflect="1" y_reflect="1"/>
+<xacro:wheel prefix="front_right" x_reflect="1" y_reflect="-1"/>
+<xacro:wheel prefix="back_left" x_reflect="-1" y_reflect="1"/>
+<xacro:wheel prefix="back_right" x_reflect="-1" y_reflect="-1"/>
+
+<link name="lidar_link">
+    <visual>
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        <geometry>
+            <cylinder radius="${lidar_radius}" length="${lidar_length}"/>
+        </geometry>
+        <material name="grey"/>
+    </visual>
+
+    <inertial>
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        <mass value="${lidar_mass}"/>
+        <inertia ixx="${(lidar_mass/12) * (3*lidar_radius*lidar_radius + lidar_length*lidar_length)}" ixy="0.0" ixz="0.0"
+        iyy="${(lidar_mass/12) * (3*lidar_radius*lidar_radius + lidar_length*lidar_length)}" iyz="0.0"
+        izz="${(lidar_mass/2) * (lidar_radius*lidar_radius)}"/>
+    </inertial>
+</link>
+
+<!-- 0.10 above base_link = 0.15 above the floor, clear of the wheel tops (0.10) -->
+<joint name="lidar_joint" type="fixed">
+    <origin xyz="0.1 0.0 0.10" rpy="0.0 0.0 0.0"/>
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+</joint>
+
+<!-- LiDAR for Gazebo -->
+<gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+        <topic>/lidar</topic>
+        <update_rate>10</update_rate>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <lidar>
+            <scan>
+                <horizontal>
+                    <samples>360</samples>
+                    <resolution>1</resolution>
+                    <min_angle>-3.14159</min_angle>
+                    <max_angle>3.14159</max_angle>
+                </horizontal>
+            </scan>
+            <range>
+                <min>0.08</min>
+                <max>10.0</max>
+                <resolution>0.01</resolution>
+            </range>
+        </lidar>
+    </sensor>
+</gazebo>
+
+<!-- Holonomic base - sets the body velocity (x, y, yaw) straight from cmd_vel.
+     Replaces MecanumDrive, which cannot strafe with plain cylinder wheels. -->
+<gazebo>
+    <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+        <topic>cmd_vel</topic>
+    </plugin>
+</gazebo>
+
+<!-- Ground-truth odometry - publishes /odom and the odom to base_footprint TF -->
+<gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+        <odom_frame>odom</odom_frame>
+        <robot_base_frame>base_footprint</robot_base_frame>
+        <odom_topic>odom</odom_topic>
+        <tf_topic>tf</tf_topic>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <dimensions>2</dimensions>
+    </plugin>
+</gazebo>
+
+<gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+        <topic>joint_states</topic>
+    </plugin>
+</gazebo>
+
+</robot>
