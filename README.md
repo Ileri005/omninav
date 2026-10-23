@@ -2,7 +2,7 @@
 
 An omnidirectional (mecanum) robot that maps an office and navigates it autonomously with ROS 2.
 
-<p align="center"><img src="docs/media/sim_navigation.png" alt="Nav2 navigating the simulated office" width="720"></p>
+<p align="center"><img src="docs/media/Omninav_sim.png" alt="Nav2 navigating the simulated office" width="720"></p>
 
 ## Status
 | Part | Status |
